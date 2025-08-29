@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kalkulator Marjin – Ringkas</title>
+  <style>
+    :root{
+      /* Dashboard dark palette (no blue): black/graphite/ash) */
+      --bg:#0a0b0d;           /* page background */
+      --bg2:#0d1117;          /* subtle gradient stop */
+      --card:#0f1217;         /* card surface */
+      --muted:#141922;        /* input surface */
+      --muted2:#0c1016;       /* result surface */
+      --stroke:#202632;       /* borders */
+      --inner:#ffffff0a;      /* inner border tint */
+      --text:#e8eaed;         /* primary text */
+      --sub:#a2a9b2;          /* secondary text */
+      --ring:#8e959e;         /* focus ring (grey) */
+      --btn1:#2b3038;         /* button gradient top */
+      --btn2:#1e2229;         /* button gradient bottom */
+      --radius:14px; 
+      --shadow:0 10px 40px rgba(0,0,0,.45);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 50% -200px, #0f131a 0%, transparent 60%),
+        linear-gradient(180deg,var(--bg),var(--bg2));
+      font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial
+    }
+    .wrap{max-width:560px;margin:34px auto;padding:0 16px}
+    .card{
+      background:var(--card);
+      border:1px solid var(--stroke);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow), inset 0 1px 0 var(--inner);
+      overflow:hidden;
+    }
+    .hdr{
+      padding:12px 16px;
+      border-bottom:1px solid var(--stroke);
+      background:linear-gradient(180deg, #10141b, #0e1218);
+      display:flex;gap:8px;align-items:center
+    }
+    .hdr h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.2px}
+    .pane{padding:16px}
+    label{display:block;font-weight:600;color:var(--sub);margin:12px 0 6px}
+    select, input[type=number], input[type=text]{
+      width:100%; background:var(--muted); color:var(--text);
+      border:1px solid var(--stroke); border-radius:12px; padding:12px 12px; outline:none;
+      box-shadow:inset 0 1px 0 var(--inner);
+    }
+    ::placeholder{color:#88909a}
+    select:focus, input:focus{border-color:var(--ring); box-shadow:0 0 0 4px #8e959e33, inset 0 1px 0 var(--inner)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btn{background:#1b1f26;border:1px solid var(--stroke);color:#f4f5f7;border-radius:12px;padding:11px 12px;font-weight:700;cursor:pointer;box-shadow:none;transition:background .15s ease,border-color .15s ease;}
+    .btn:hover{background:#20252d;border-color:#2a313d;}
+    .btn:active{background:#1a1e25;}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .result{
+      padding:16px; border-top:1px solid var(--stroke); background:linear-gradient(180deg,#0c1016,#0b0f14);
+    }
+    .result small{color:var(--sub)}
+    .money{font-size:24px;font-weight:800;margin-top:6px;text-shadow:0 1px 0 #000}
+    .err{margin-top:10px;color:#ef4444;font-size:12px;display:none}
+    .inline{display:flex;gap:10px;align-items:center}
+    .inline input{flex:1}
+    .mini{font-size:12px;color:var(--sub)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="hdr"><h1>Kalkulator Marjin</h1></div>
+      <div class="pane">
+        <div class="row">
+          <div>
+            <label>Mata Uang Akun</label>
+            <select id="accountCcy">
+              <option>USD</option>
+              <option>EUR</option>
+              <option>IDR</option>
+              <option>JPY</option>
+            </select>
+          </div>
+          <div>
+            <label>Tipe Akun</label>
+            <select id="accountType">
+              <option value="standard" selected>Standar</option>
+              <option value="cent">Cent</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Pasangan Mata Uang</label>
+        <select id="pair"></select>
+
+        <label id="priceLabel" style="margin-top:10px">Harga Konversi (EUR/USD)</label>
+        <div class="inline">
+          <input id="price" type="number" step="0.00001" placeholder="mis. 1.10000" />
+          <button class="btn" id="auto">Auto</button>
+        </div>
+        <div class="mini">Harga = 1 BASE = X QUOTE (contoh EUR/USD berarti 1 EUR dalam USD)</div>
+
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Rasio Marjin</label>
+            <select id="leverage">
+              <option value="1">1:1</option>
+              <option value="5">5:1</option>
+              <option value="10">10:1</option>
+              <option value="20">20:1</option>
+              <option value="25">25:1</option>
+              <option value="30">30:1</option>
+              <option value="40">40:1</option>
+              <option value="50" selected>50:1</option>
+              <option value="100">100:1</option>
+              <option value="200">200:1</option>
+              <option value="300">300:1</option>
+              <option value="400">400:1</option>
+              <option value="500">500:1</option>
+              <option value="600">600:1</option>
+            </select>
+          </div>
+          <div>
+            <label>Lot</label>
+            <input id="lots" type="number" step="0.01" value="0.01" />
+            <div class="mini">1 lot = 100.000 unit (0.01 lot = 1.000 unit)</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button class="btn" id="calc">Hitung</button>
+          <button class="btn" id="reset">Reset</button>
+        </div>
+        <div class="err" id="err"></div>
+      </div>
+
+      <div class="result">
+        <small>Marjin yang Dipakai (<span id="acct">USD</span>):</small>
+        <div class="money" id="margin">–</div>
+        <div class="mini" id="note">—</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id)=>document.getElementById(id);
+    const accountCcy = $('accountCcy');
+    const accountTypeEl = $('accountType');
+    const pairEl = $('pair');
+    const priceEl = $('price');
+    const priceLabel = $('priceLabel');
+    const leverageEl = $('leverage');
+    const lotsEl = $('lots');
+    const marginEl = $('margin');
+    const acctEl = $('acct');
+    const noteEl = $('note');
+    const errEl = $('err');
+
+    const pairsList = [
+      "AUD/CAD","AUD/CHF","AUD/JPY","AUD/NZD","AUD/USD",
+      "CAD/JPY","CHF/JPY",
+      "EUR/AUD","EUR/CHF","EUR/GBP","EUR/IDR","EUR/JPY","EUR/NZD","EUR/USD",
+      "GBP/AUD","GBP/CAD","GBP/CHF","GBP/JPY","GBP/NZD","GBP/USD",
+      "NZD/JPY","NZD/USD",
+      "USD/CAD","USD/CHF","USD/DKK","USD/HKD","USD/IDR","USD/JPY","USD/SGD"
+    ].sort((a,b)=>a.localeCompare(b,'en'));
+
+    function populatePairs(){
+      pairEl.innerHTML = '';
+      for(const p of pairsList){
+        const opt = document.createElement('option'); opt.textContent = p; opt.value = p; pairEl.appendChild(opt);
+      }
+      pairEl.value = 'EUR/USD';
+      setPriceLabel();
+    }
+
+    function parsePair(p){ const [base, quote] = p.split('/'); return {base, quote}; }
+
+    function fmt(n, ccy){
+      try{ return new Intl.NumberFormat('id-ID',{style:'currency',currency:ccy,maximumFractionDigits:2}).format(n); }
+      catch(_){ return new Intl.NumberFormat('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+` ${ccy}`; }
+    }
+
+    async function fx(base, quote){
+      const url = `https://api.exchangerate.host/latest?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(quote)}`;
+      const r = await fetch(url); if(!r.ok) throw new Error('Gagal ambil kurs');
+      const j = await r.json(); return j.rates[quote];
+    }
+
+    function setPriceLabel(){ const p = pairEl.value; priceLabel.textContent = `Harga Konversi (${p})`; }
+    pairEl.addEventListener('change', setPriceLabel);
+
+    $('auto').addEventListener('click', async ()=>{
+      const {base, quote} = parsePair(pairEl.value);
+      const btn = $('auto'); btn.disabled = true; btn.textContent = '...'; errEl.style.display='none';
+      try{ const rate = await fx(base, quote); priceEl.value = (quote==='JPY' ? rate.toFixed(3) : rate.toFixed(5)); }
+      catch(e){ errEl.textContent = 'Gagal mengambil harga otomatis. Isi manual ya.'; errEl.style.display='block'; }
+      finally{ btn.disabled=false; btn.textContent='Auto'; }
+    });
+
+    $('calc').addEventListener('click', async ()=>{
+      errEl.style.display='none';
+      const p = pairEl.value; const {base, quote} = parsePair(p);
+      const acct = accountCcy.value; const acctType = accountTypeEl.value;
+      const price = parseFloat(priceEl.value); const lev = parseFloat(leverageEl.value);
+      const lots = parseFloat(lotsEl.value||0); const sizeBase = lots * 100000; // 1 lot = 100k
+
+      if(!price || price<=0 || !lev || !lots){ errEl.textContent = 'Lengkapi semua input dengan benar.'; errEl.style.display='block'; return; }
+
+      const notionalQuote = sizeBase * price; // unit BASE * harga (quote/base)
+      let conv = 1; if(quote !== acct){ try{ conv = await fx(quote, acct); }catch(e){ errEl.textContent = 'Konversi kurs ke mata uang akun gagal. Hasil ditampilkan 1:1.'; errEl.style.display='block'; conv = 1; } }
+      const notionalAcct = notionalQuote * conv; let marginReq = notionalAcct / lev;
+
+      let acctLabel = acct; if(acctType==='cent'){ marginReq *= 100; acctLabel = `${acct} (Cent)`; }
+      acctEl.textContent = acctLabel; marginEl.textContent = fmt(marginReq, acct);
+      noteEl.textContent = `Notional ${fmt(notionalAcct, acct)} • Leverage 1:${lev} • Volume ${sizeBase.toLocaleString('id-ID')} ${base}` + (acctType==='cent' ? ' • Akun Cent (x100)' : '');
+    });
+
+    $('reset').addEventListener('click', ()=>{
+      accountCcy.value = 'USD'; accountTypeEl.value = 'standard';
+      pairEl.value = 'EUR/USD'; setPriceLabel(); priceEl.value = '';
+      leverageEl.value = '50'; lotsEl.value = 0.01; acctEl.textContent = 'USD';
+      marginEl.textContent = '–'; noteEl.textContent = '—'; errEl.style.display='none';
+    });
+
+    populatePairs();
+  </script>
+</body>
+</html>
