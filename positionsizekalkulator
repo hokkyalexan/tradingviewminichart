@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kalkulator Position Size – Vertical Simple (Responsive)</title>
+  <style>
+    :root{ --bg:#0a0b0d; --card:#10151b; --muted:#171c24; --muted2:#0f141a; --text:#e8eaed; --sub:#a2a9b2; --ring:#8e959e; --stroke:#232a36; --inner:#ffffff08; --radius:12px; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;color:var(--text);background:linear-gradient(180deg,#0a0b0d,#0c1016);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    .wrap{max-width:640px;margin:28px auto;padding:0 14px}
+    .card{background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 var(--inner);padding:1.2em; font-size:calc(14px * var(--s,1));}
+    .title{font-size:1.15em;margin:0 0 .6em;font-weight:700}
+    label{display:block;font-weight:600;color:var(--sub);margin:.7em 0 .35em}
+    select,input[type=number],input[type=text]{width:100%;background:var(--muted);color:var(--text);border:1px solid var(--stroke);border-radius:.7em;padding:.75em .9em;outline:none;box-shadow:inset 0 1px 0 var(--inner)}
+    select:focus,input:focus{border-color:var(--ring);box-shadow:0 0 0 .22em #8e959e33, inset 0 1px 0 var(--inner)}
+    .row{display:flex;gap:.7em}
+    .row > *{flex:1}
+    .btn{background:#1b1f26;border:1px solid var(--stroke);color:#f4f5f7;border-radius:.7em;padding:.75em .9em;font-weight:700;cursor:pointer;box-shadow:none}
+    .btn:hover{background:#20252d;border-color:#2a313d}
+    .btn:active{background:#1a1e25}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .inline{display:flex;gap:.6em;align-items:center}
+    .inline input{flex:1}
+    .mini{font-size:.85em;color:var(--sub)}
+    .out{background:var(--muted2);border:1px solid var(--stroke);border-radius:.7em;padding:.8em .9em}
+    .sep{height:1px;background:var(--stroke);margin:1em 0}
+    .aslink{background:transparent;border:0;color:#cbd5e1;padding:0 .3em;text-decoration:underline;cursor:pointer;font-size:.9em}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="cardRoot">
+      <h1 class="title">Kalkulator Position Size</h1>
+
+      <label>Saldo Akun</label>
+      <input id="balance" type="number" step="0.01" placeholder="mis. 10000" value="10000" />
+
+      <label>Mata Uang Akun</label>
+      <select id="accountCcy">
+        <option>USD</option>
+        <option>EUR</option>
+        <option>IDR</option>
+        <option>JPY</option>
+      </select>
+
+      <label>Risiko (%)</label>
+      <input id="riskPct" type="number" step="0.01" value="2.00" />
+
+      <label>Instrumen</label>
+      <select id="pair"></select>
+
+      <label>Harga Buka</label>
+      <div class="inline">
+        <input id="open" type="number" step="0.00001" placeholder="mis. 1.10000" />
+        <button class="btn" id="auto">Auto</button>
+      </div>
+
+      <div class="row" style="align-items:center;margin-top:.6em">
+        <label style="margin:0"> <span id="slLabel">Stop Loss (Harga)</span> </label>
+        <button class="aslink" id="toggle">Switch to Pips</button>
+      </div>
+      <input id="slPrice" type="number" step="0.00001" placeholder="mis. 1.09800" />
+      <input id="slPips" type="number" step="0.1" placeholder="mis. 20" style="display:none" />
+
+      <div class="row" style="margin-top:.8em">
+        <button class="btn" id="calc">Hitung</button>
+        <button class="btn" id="reset">Reset</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <label>Trade Size (unit)</label>
+      <div class="out" id="sizeOut">–</div>
+      <label style="margin-top:.6em">Trade Size (lot)</label>
+      <div class="out" id="lotOut">–</div>
+      <label style="margin-top:.6em">Uang Berisiko</label>
+      <div class="out" id="riskOut">–</div>
+      <div class="mini" id="note" style="margin-top:.5em">—</div>
+    </div>
+  </div>
+
+  <script>
+    // === Responsive scaling based on container width ===
+    (function(){
+      const root = document.getElementById('cardRoot');
+      const BASE = 480;        // desain basis
+      const MIN = 0.85, MAX = 1.35; // batas skala
+      const ro = new ResizeObserver(entries=>{
+        for(const e of entries){
+          const w = e.contentRect.width;
+          const s = Math.max(MIN, Math.min(MAX, w/BASE));
+          root.style.setProperty('--s', s.toFixed(3));
+        }
+      });
+      ro.observe(root);
+    })();
+
+    const $ = (id)=>document.getElementById(id);
+    const accountCcy = $('accountCcy');
+    const pairEl = $('pair');
+    const balanceEl = $('balance');
+    const riskPctEl = $('riskPct');
+    const openEl = $('open');
+    const slPriceEl = $('slPrice');
+    const slPipsEl = $('slPips');
+    const toggleBtn = $('toggle');
+    const sizeOut = $('sizeOut');
+    const lotOut = $('lotOut');
+    const riskOut = $('riskOut');
+    const noteEl = $('note');
+    const errEl = document.createElement('div'); errEl.className='mini'; errEl.style.color='#ef4444'; document.querySelector('.card').insertBefore(errEl, document.querySelector('.sep'));
+    const priceLabel = $('slLabel');
+
+    // ===== Instruments =====
+    // FX symbols (no slash)
+    const fxSyms = [
+      'AUDCAD','AUDCHF','AUDJPY','AUDNZD','AUDUSD',
+      'CADJPY','CHFJPY',
+      'EURAUD','EURCHF','EURGBP','EURIDR','EURJPY','EURNZD','EURUSD',
+      'GBPAUD','GBPCAD','GBPCHF','GBPJPY','GBPNZD','GBPUSD',
+      'NZDJPY','NZDUSD',
+      'USDCAD','USDCHF','USDDKK','USDHKD','USDIDR','USDJPY','USDSGD'
+    ];
+
+    // Metals & Index/CFD extras
+    const extras = [
+      {sym:'XAUUSD', type:'metal', base:'XAU', quote:'USD', label:'XAU/USD'},
+      {sym:'XAGUSD', type:'metal', base:'XAG', quote:'USD', label:'XAG/USD'},
+      {sym:'USOIL',  type:'cfd',   base:'USOIL', quote:'USD', label:'USOIL'},
+      {sym:'US500',  type:'index', base:'US500', quote:'USD', label:'US500'},
+      {sym:'NASDAQ', type:'index', base:'NASDAQ',quote:'USD', label:'NASDAQ'}
+    ];
+
+    const fxInstruments = fxSyms.map(sym=>({
+      sym, type:'fx', base:sym.slice(0,3), quote:sym.slice(3), label:sym.slice(0,3)+'/'+sym.slice(3)
+    }));
+
+    const instruments = [...fxInstruments, ...extras].sort((a,b)=>a.label.localeCompare(b.label,'en'));
+    const instMap = Object.fromEntries(instruments.map(i=>[i.sym, i]));
+
+    function populatePairs(){
+      pairEl.innerHTML='';
+      for(const inst of instruments){
+        const o=document.createElement('option'); o.value=inst.sym; o.textContent=inst.label; pairEl.appendChild(o);
+      }
+      pairEl.value='EURUSD';
+    }
+
+    function pipSize(inst){
+      if(inst.type==='fx'){
+        if(inst.quote==='JPY') return 0.01; if(inst.quote==='IDR') return 1; return 0.0001;
+      }
+      if(inst.type==='metal') return inst.sym==='XAGUSD' ? 0.001 : 0.01; // XAG 0.001, XAU 0.01
+      return 1; // index/CFD default 1 point
+    }
+
+    function fmtCurrency(n, ccy){
+      try{ return new Intl.NumberFormat('id-ID',{style:'currency',currency:ccy,maximumFractionDigits:2}).format(n); }
+      catch(_){ return new Intl.NumberFormat('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+` ${ccy}`; }
+    }
+
+    async function fx(base, quote){
+      const url=`https://api.exchangerate.host/latest?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(quote)}`;
+      const r=await fetch(url); if(!r.ok) throw new Error('Gagal ambil kurs');
+      const j=await r.json(); return j.rates[quote];
+    }
+
+    function autoDecimals(inst){
+      if(inst.type==='fx') return (inst.quote==='JPY'?3:(inst.quote==='IDR'?2:5));
+      if(inst.type==='metal') return inst.sym==='XAGUSD'?3:2; // XAG 3dp, XAU 2dp
+      if(inst.type==='cfd') return 2; // oil
+      return 1; // index
+    }
+
+    function err(msg){ errEl.textContent = msg||''; }
+
+    // Auto price by instrument name
+    $('auto').addEventListener('click', async ()=>{
+      const sym = pairEl.value; const inst = instMap[sym];
+      const btn=$('auto'); btn.disabled=true; btn.textContent='...'; err('');
+      try{
+        if(inst.type==='fx' || inst.type==='metal'){
+          const rate=await fx(inst.base, inst.quote);
+          openEl.value = rate.toFixed(autoDecimals(inst));
+        }else{
+          err('Auto harga belum tersedia untuk instrumen ini. Isi manual ya.');
+        }
+      }catch(e){ err('Gagal mengambil harga otomatis. Isi manual ya.'); }
+      finally{ btn.disabled=false; btn.textContent='Auto'; }
+    });
+
+    // Toggle SL mode
+    let mode='price';
+    toggleBtn.addEventListener('click',()=>{
+      if(mode==='price'){ mode='pips'; slPriceEl.style.display='none'; slPipsEl.style.display='block'; toggleBtn.textContent='Switch to Price'; priceLabel.textContent='Stop Loss (Pips)'; }
+      else { mode='price'; slPriceEl.style.display='block'; slPipsEl.style.display='none'; toggleBtn.textContent='Switch to Pips'; priceLabel.textContent='Stop Loss (Harga)'; }
+    });
+
+    // Calculate
+    document.getElementById('calc').addEventListener('click', async ()=>{
+      err('');
+      const inst = instMap[pairEl.value];
+      const acct = accountCcy.value; const balance = parseFloat(balanceEl.value||0); const riskPct = parseFloat(riskPctEl.value||0);
+      const open = parseFloat(openEl.value||0);
+      let stopPips;
+      if(mode==='price'){
+        const sl = parseFloat(slPriceEl.value||0); const p = pipSize(inst); stopPips = Math.abs(open - sl) / p;
+      } else { stopPips = parseFloat(slPipsEl.value||0); }
+
+      if(balance<=0 || riskPct<=0 || open<=0 || !stopPips || stopPips<=0){ err('Isi saldo, % risiko, harga buka, dan stop loss dengan benar.'); return; }
+
+      const riskAcct = balance * (riskPct/100);
+      let convQuoteToAcct = 1;
+      if(inst.quote !== acct){
+        try{ convQuoteToAcct = await fx(inst.quote, acct); }
+        catch(e){ err('Konversi kurs ke mata uang akun gagal. Asumsi 1:1.'); convQuoteToAcct = 1; }
+      }
+      const riskQuote = riskAcct / convQuoteToAcct;
+
+      const p = pipSize(inst);
+      const units = riskQuote / (stopPips * p);
+      const lots = units / 100000;
+
+      sizeOut.textContent = Math.floor(units).toLocaleString('id-ID');
+      lotOut.textContent = lots.toFixed(2);
+      riskOut.textContent = fmtCurrency(riskAcct, acct);
+      noteEl.textContent = `Inst: ${inst.label} • Stop ${stopPips.toFixed(1)} pips • Pip ${p}`;
+    });
+
+    // Reset
+    document.getElementById('reset').addEventListener('click', ()=>{
+      accountCcy.value='USD'; pairEl.value='EURUSD'; balanceEl.value=10000; riskPctEl.value=2.00; openEl.value=''; slPriceEl.value=''; slPipsEl.value='';
+      mode='price'; slPriceEl.style.display='block'; slPipsEl.style.display='none'; toggleBtn.textContent='Switch to Pips'; priceLabel.textContent='Stop Loss (Harga)';
+      sizeOut.textContent='–'; lotOut.textContent='–'; riskOut.textContent='–'; noteEl.textContent='—'; err('');
+    });
+
+    // Populate and quick auto on change if empty
+    populatePairs();
+    pairEl.addEventListener('change', async ()=>{
+      if(!openEl.value){
+        const inst = instMap[pairEl.value];
+        if(inst.type==='fx' || inst.type==='metal'){
+          try{ const rate=await fx(inst.base, inst.quote); openEl.value=rate.toFixed(autoDecimals(inst)); }catch(_){/* ignore */}
+        }
+      }
+    });
+  </script>
+</body>
+</html>
